@@ -4,11 +4,34 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:FavoritasBackUp"
-    Title="FavoritasBackUp">
+    Title="FavoritasBackUp"
+    FlyoutBehavior="Disabled"
+    Shell.TabBarIsVisible="False">
+
+    <ShellContent Route="Loading">
+        <ShellContent.ContentTemplate>
+            <DataTemplate>
+                <ContentPage BackgroundColor="#F5F7FA" Shell.NavBarIsVisible="False">
+                    <Grid Padding="24">
+                        <Label Text="Carregando configurações..."
+                               TextColor="#53657D"
+                               FontSize="16"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                    </Grid>
+                </ContentPage>
+            </DataTemplate>
+        </ShellContent.ContentTemplate>
+    </ShellContent>
 
     <ShellContent
         Title="Home"
         ContentTemplate="{DataTemplate local:ConfigPage}"
         Route="ConfigPage" />
+
+    <ShellContent
+        Title="Sincronização"
+        ContentTemplate="{DataTemplate local:SyncPage}"
+        Route="SyncPage" />
 
 </Shell>

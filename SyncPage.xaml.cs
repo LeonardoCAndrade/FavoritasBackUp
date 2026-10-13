@@ -15,7 +15,7 @@ public partial class SyncPage : ContentPage
 
     private async void OnSyncClicked(object sender, EventArgs e)
     {
-        await DisplayAlert(
+        await DisplayAlertAsync(
             "Sincronização",
             "A sincronização com a nuvem será implementada em breve.",
             "OK");

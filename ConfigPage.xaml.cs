@@ -105,6 +105,6 @@ public partial class ConfigPage : ContentPage
             SaveConfigurationButton.IsEnabled = true;
         }
 
-        await Shell.Current.GoToAsync(nameof(SyncPage));
+        await Shell.Current.GoToAsync($"//{nameof(SyncPage)}");
     }
 }
