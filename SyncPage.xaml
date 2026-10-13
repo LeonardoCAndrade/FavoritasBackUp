@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="FavoritasBackUp.SyncPage"
+    BackgroundColor="#F5F7FA"
+    Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Cabeçalho -->
+        <Grid Grid.Row="0"
+              BackgroundColor="#2459A9"
+              Padding="24,20"
+              ColumnDefinitions="*,Auto">
+
+            <Label
+                Text="Favoritas Back-Up"
+                FontSize="23"
+                FontAttributes="Bold"
+                TextColor="White"
+                VerticalOptions="Center" />
+
+            <Button
+                Grid.Column="1"
+                Text="⚙"
+                FontSize="30"
+                TextColor="White"
+                BackgroundColor="Transparent"
+                WidthRequest="48"
+                HeightRequest="48"
+                Padding="0"
+                Clicked="OnSettingsClicked"
+                SemanticProperties.Description="Abrir configurações" />
+
+        </Grid>
+
+        <!-- Conteúdo principal -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout
+                Padding="28,36"
+                Spacing="24"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                MaximumWidthRequest="440">
+
+                <!-- Ilustração -->
+                <Border
+                    HeightRequest="200"
+                    WidthRequest="240"
+                    BackgroundColor="#E7EFFC"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 32"
+                    HorizontalOptions="Center">
+
+                    <VerticalStackLayout
+                        VerticalOptions="Center"
+                        HorizontalOptions="Center"
+                        Spacing="0">
+
+                        <Label
+                            Text="☁"
+                            FontSize="105"
+                            TextColor="#2459A9"
+                            HorizontalTextAlignment="Center" />
+
+                        <Label
+                            Text="↑"
+                            FontSize="42"
+                            FontAttributes="Bold"
+                            TextColor="#2459A9"
+                            HorizontalTextAlignment="Center"
+                            Margin="0,-42,0,0" />
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label
+                    Text="Suas fotos favoritas sempre seguras"
+                    FontSize="25"
+                    FontAttributes="Bold"
+                    TextColor="#172B4D"
+                    HorizontalTextAlignment="Center"
+                    LineBreakMode="WordWrap" />
+
+                <Label
+                    Text="Toque no botão abaixo para sincronizar as imagens marcadas como favoritas da sua galeria com a sua nuvem."
+                    FontSize="15"
+                    TextColor="#53657D"
+                    HorizontalTextAlignment="Center"
+                    LineBreakMode="WordWrap" />
+
+                <!-- Botão principal -->
+                <Button
+                    x:Name="SyncButton"
+                    Text="⟳  Sincronizar"
+                    BackgroundColor="#2459A9"
+                    TextColor="White"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    CornerRadius="16"
+                    HeightRequest="64"
+                    HorizontalOptions="Fill"
+                    Margin="0,12,0,0"
+                    Clicked="OnSyncClicked" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Status inferior -->
+        <Border
+            Grid.Row="2"
+            BackgroundColor="#E7EFFC"
+            StrokeThickness="0"
+            StrokeShape="RoundRectangle 20"
+            Margin="20,8,20,24"
+            Padding="18">
+
+            <Grid ColumnDefinitions="Auto,*"
+                  ColumnSpacing="14">
+
+                <Label
+                    Text="☁"
+                    FontSize="30"
+                    TextColor="#2459A9"
+                    VerticalOptions="Center" />
+
+                <VerticalStackLayout
+                    Grid.Column="1"
+                    Spacing="5">
+
+                    <Label
+                        Text="Última sincronização"
+                        FontSize="15"
+                        FontAttributes="Bold"
+                        TextColor="#172B4D" />
+
+                    <Label
+                        x:Name="LastSyncLabel"
+                        Text="Nunca foi realizada"
+                        FontSize="13"
+                        TextColor="#53657D" />
+
+                    <Label
+                        x:Name="SyncStatusLabel"
+                        Text="Aguardando sincronização"
+                        FontSize="12"
+                        TextColor="#53657D" />
+
+                </VerticalStackLayout>
+            </Grid>
+        </Border>
+
+    </Grid>
+</ContentPage>

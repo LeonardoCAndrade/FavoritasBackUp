@@ -1,0 +1,161 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="FavoritasBackUp.ConfigPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Configuração"
+    BackgroundColor="#F5F7FA">
+
+    <ScrollView>
+        <Grid Padding="24"
+              MinimumHeightRequest="600"
+              VerticalOptions="Fill">
+
+            <VerticalStackLayout
+                Spacing="20"
+                VerticalOptions="Center"
+                MaximumWidthRequest="440"
+                HorizontalOptions="Center">
+
+                <!-- Cabeçalho -->
+                <VerticalStackLayout
+                    Spacing="10"
+                    HorizontalOptions="Center"
+                    Margin="0,0,0,12">
+
+                    <Border
+                        WidthRequest="76"
+                        HeightRequest="76"
+                        BackgroundColor="#DCE9FF"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 22"
+                        HorizontalOptions="Center">
+
+                        <Label
+                            Text="☁"
+                            FontSize="44"
+                            TextColor="#2459A9"
+                            HorizontalOptions="Center"
+                            VerticalOptions="Center" />
+                    </Border>
+
+                    <Label
+                        Text="Bem-vindo"
+                        FontSize="28"
+                        FontAttributes="Bold"
+                        TextColor="#172B4D"
+                        HorizontalTextAlignment="Center" />
+
+                    <Label
+                        Text="Configure sua nuvem para começar a sincronizar suas fotos favoritas."
+                        FontSize="14"
+                        TextColor="#53657D"
+                        HorizontalTextAlignment="Center"
+                        LineBreakMode="WordWrap"
+                        MaximumWidthRequest="340" />
+                </VerticalStackLayout>
+
+                <!-- Endereço da nuvem -->
+                <VerticalStackLayout Spacing="8">
+                    <Label
+                        Text="Endereço da nuvem"
+                        FontSize="14"
+                        FontAttributes="Bold"
+                        TextColor="#26354A" />
+
+                    <Border
+                        BackgroundColor="White"
+                        Stroke="#CBD5E1"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 12"
+                        Padding="12,2">
+
+                        <Entry
+                            x:Name="CloudAddressEntry"
+                            Placeholder="https://minha-nuvem.com/dav/"
+                            Keyboard="Url"
+                            ClearButtonVisibility="WhileEditing"
+                            TextColor="#172B4D"
+                            PlaceholderColor="#94A3B8"
+                            BackgroundColor="Transparent"
+                            HeightRequest="48" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- Usuário -->
+                <VerticalStackLayout Spacing="8">
+                    <Label
+                        Text="Usuário"
+                        FontSize="14"
+                        FontAttributes="Bold"
+                        TextColor="#26354A" />
+
+                    <Border
+                        BackgroundColor="White"
+                        Stroke="#CBD5E1"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 12"
+                        Padding="12,2">
+
+                        <Entry
+                            x:Name="UsernameEntry"
+                            Placeholder="Digite seu usuário"
+                            Keyboard="Default"
+                            ClearButtonVisibility="WhileEditing"
+                            TextColor="#172B4D"
+                            PlaceholderColor="#94A3B8"
+                            BackgroundColor="Transparent"
+                            HeightRequest="48" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- Senha -->
+                <VerticalStackLayout Spacing="8">
+                    <Label
+                        Text="Senha"
+                        FontSize="14"
+                        FontAttributes="Bold"
+                        TextColor="#26354A" />
+
+                    <Border
+                        BackgroundColor="White"
+                        Stroke="#CBD5E1"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 12"
+                        Padding="12,2">
+
+                        <Entry
+                            x:Name="PasswordEntry"
+                            Placeholder="Digite sua senha"
+                            IsPassword="True"
+                            ClearButtonVisibility="Never"
+                            TextColor="#172B4D"
+                            PlaceholderColor="#94A3B8"
+                            BackgroundColor="Transparent"
+                            HeightRequest="48" />
+                    </Border>
+                </VerticalStackLayout>
+
+                <!-- Ação principal -->
+                <Button
+                    x:Name="SaveConfigurationButton"
+                    Text="Salvar configuração"
+                    Clicked="OnSaveConfigurationClicked"
+                    BackgroundColor="#2459A9"
+                    TextColor="White"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    CornerRadius="12"
+                    HeightRequest="54"
+                    Margin="0,4,0,0" />
+
+                <Label
+                    Text="Suas credenciais serão armazenadas no dispositivo."
+                    FontSize="12"
+                    TextColor="#64748B"
+                    HorizontalTextAlignment="Center" />
+
+            </VerticalStackLayout>
+        </Grid>
+    </ScrollView>
+</ContentPage>
