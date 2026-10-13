@@ -4,14 +4,17 @@ namespace FavoritasBackUp
 {
     public partial class App : Application
     {
-        public App()
+        private readonly IServiceProvider _services;
+
+        public App(IServiceProvider services)
         {
+            _services = services;
             InitializeComponent();
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            return new Window(new AppShell());
+            return new Window(_services.GetRequiredService<AppShell>());
         }
     }
 }
