@@ -20,6 +20,9 @@ namespace FavoritasBackUp
 
             builder.Services.AddSingleton<ISecureStorage>(SecureStorage.Default);
             builder.Services.AddSingleton<CloudConfigurationService>();
+#if ANDROID
+            builder.Services.AddSingleton<IPhotoLibraryService, FavoritasBackUp.Platforms.Android.Services.AndroidPhotoLibraryService>();
+#endif
             builder.Services.AddTransient<ConfigPage>();
             builder.Services.AddTransient<SyncPage>();
             builder.Services.AddTransient<AppShell>();

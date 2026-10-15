@@ -84,7 +84,7 @@
                     LineBreakMode="WordWrap" />
 
                 <Label
-                    Text="Toque no botão abaixo para sincronizar as imagens marcadas como favoritas da sua galeria com a sua nuvem."
+                    Text="Toque no botão abaixo para contar as imagens acessíveis e as favoritas expostas pela galeria. Nenhuma imagem será enviada à nuvem nesta etapa."
                     FontSize="15"
                     TextColor="#53657D"
                     HorizontalTextAlignment="Center"
@@ -103,6 +103,13 @@
                     HorizontalOptions="Fill"
                     Margin="0,12,0,0"
                     Clicked="OnSyncClicked" />
+
+                <ActivityIndicator
+                    x:Name="ReadIndicator"
+                    IsVisible="False"
+                    IsRunning="False"
+                    Color="#2459A9"
+                    SemanticProperties.Description="Lendo metadados das imagens" />
 
             </VerticalStackLayout>
         </ScrollView>
