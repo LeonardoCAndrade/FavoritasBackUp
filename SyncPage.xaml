@@ -84,7 +84,7 @@
                     LineBreakMode="WordWrap" />
 
                 <Label
-                    Text="Toque no botão abaixo para contar as imagens acessíveis e as favoritas expostas pela galeria. Nenhuma imagem será enviada à nuvem nesta etapa."
+                    Text="Envie para o Nextcloud as fotos favoritas capturadas hoje, conforme o horário local do celular. Os arquivos originais serão preservados."
                     FontSize="15"
                     TextColor="#53657D"
                     HorizontalTextAlignment="Center"
@@ -109,7 +109,7 @@
                     IsVisible="False"
                     IsRunning="False"
                     Color="#2459A9"
-                    SemanticProperties.Description="Lendo metadados das imagens" />
+                    SemanticProperties.Description="Enviando imagens" />
 
             </VerticalStackLayout>
         </ScrollView>

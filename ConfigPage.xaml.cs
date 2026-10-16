@@ -68,12 +68,13 @@ public partial class ConfigPage : ContentPage
         }
 
         if (!Uri.TryCreate(address, UriKind.Absolute, out Uri? uri) ||
-            (uri.Scheme != Uri.UriSchemeHttps &&
-             uri.Scheme != Uri.UriSchemeHttp))
+            uri.Scheme != Uri.UriSchemeHttps ||
+            !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment) || username.Contains(':'))
         {
             await DisplayAlertAsync(
                 "Endereço inválido",
-                "Informe um endereço válido começando com HTTP ou HTTPS.",
+                "Informe a URL WebDAV HTTPS do Nextcloud, sem credenciais, parâmetros ou fragmentos. O usuário não pode conter dois-pontos.",
                 "OK");
 
             return;

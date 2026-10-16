@@ -21,7 +21,7 @@ A arquitetura deve priorizar simplicidade, separação de responsabilidades, seg
 | Injeção de dependência | Gerenciamento de serviços e dependências |
 | SecureStorage | Armazenamento seguro das configurações |
 | Android MediaStore | Consulta das imagens do dispositivo |
-| HttpClient | Comunicação futura com a API de backup |
+| HttpClient | Comunicação WebDAV com o Nextcloud |
 | SQLite | Persistência futura do controle de sincronização |
 
 O Android é a plataforma principal do projeto.
@@ -95,7 +95,7 @@ Responsabilidades:
 
 - Persistência e recuperação de configurações.
 - Consulta e identificação das fotos favoritas.
-- Futuramente, comunicação com a nuvem.
+- Comunicação WebDAV com o Nextcloud por `INextcloudBackupService` e `NextcloudBackupService`.
 - Futuramente, controle das imagens sincronizadas.
 
 Serviços devem possuir responsabilidades bem definidas e evitar dependência direta das páginas.
@@ -205,13 +205,13 @@ Pode incluir:
 - Nome do arquivo.
 - URI de conteúdo.
 - Indicador de favorita.
-- Data de inclusão.
+- Data de inclusão (`DateAddedUtc`) e captura (`DateTakenUtc`), separadas. A captura usa `DATE_TAKEN` do MediaStore em milissegundos Unix, sem substituição pela inclusão.
 
 O model não deve armazenar o conteúdo binário da imagem.
 
 ### IPhotoLibraryService
 
-Define o contrato de consulta das imagens, sem dependência direta do Android.
+Define a consulta das imagens e abertura de streams de leitura por URI, sem dependência direta do Android. O chamador deve liberar os streams retornados.
 
 ### AndroidPhotoLibraryService
 
@@ -256,31 +256,24 @@ Regras:
 
 O aplicativo deve continuar funcional mesmo quando o usuário não conceder acesso às imagens, apresentando uma mensagem adequada.
 
-## 10. Backup para a nuvem — Planejado
+## 10. Backup manual para o Nextcloud
 
-O backup será realizado por meio de uma API HTTP configurada pelo usuário.
+`NextcloudBackupService` implementa `INextcloudBackupService` e recebe `HttpClient`, `CloudConfigurationService` e `IPhotoLibraryService` por injeção de dependência. `BackupResult` contém total de favoritas de hoje, enviadas, ignoradas, falhas e mensagem segura de erro.
 
-A implementação deverá separar a consulta das imagens da comunicação com o servidor.
+Fluxo:
 
-Fluxo previsto:
+1. Capturar o dia/fuso local no início e consultar as favoritas pelo serviço existente.
+2. Selecionar favoritas cuja captura UTC convertida para o fuso local corresponda ao dia. Capturas ausentes, zero ou inválidas não são substituídas pela inclusão.
+3. Recuperar configurações do SecureStorage. Exigir URL WebDAV HTTPS sem credenciais embutidas, query ou fragmento. Autenticar com HTTP Basic e senha de aplicativo.
+4. Criar `FavoritasBackUp/` na raiz WebDAV por `MKCOL`. HTTP 405 requer `PROPFIND` com `Depth: 0` para confirmar uma coleção existente; um arquivo ocupando esse caminho é falha.
+5. Calcular SHA-256 do conteúdo por streaming e usar o hash completo como nome seguro e estável, sem extensão. Abrir novamente a URI para enviar sequencialmente por streaming usando `PUT` e `If-None-Match: *`. HTTP 412 conta como ignorado; conteúdos idênticos compartilham o destino.
+6. Contabilizar erros por imagem, mantendo os envios anteriores. Falhas na configuração/pasta contabilizam todas as candidatas como falhas. Uma queda de conexão após envio pode deixar o arquivo no servidor; a próxima tentativa o reconhecerá pela condição HTTP.
 
-1. Identificar as imagens favoritas.
-2. Verificar quais precisam de backup.
-3. Acessar o conteúdo da imagem por sua URI.
-4. Enviar o conteúdo para o servidor.
-5. Registrar o resultado da operação.
+O `HttpClient` singleton é registrado no `MauiProgram.cs` com `SocketsHttpHandler`, sem redirecionamentos nem cookies e limite de dez minutos por requisição. Credenciais são colocadas em cada requisição, sem cabeçalho global compartilhado. A validação TLS permanece ativa.
 
-Diretrizes:
+O serviço bloqueia execuções simultâneas; a SyncPage também desabilita o botão e mostra “Enviando imagens...”. Sair da página cancela a operação e libera os streams. A interface apresenta o resultado e indica acesso parcial. O horário de última sincronização é atualizado somente para um conjunto não vazio sem falhas (envios ou arquivos existentes), permanecendo em memória na página. Nenhum original é alterado ou excluído.
 
-- Utilizar `HttpClient` para comunicação.
-- Priorizar HTTPS.
-- Evitar carregar arquivos completos na memória.
-- Preferir transferência por streaming.
-- Tratar falhas de conexão e respostas de erro.
-- Evitar uploads duplicados.
-- Não excluir ou modificar as fotos originais.
-
-O contrato da API e a estratégia de autenticação serão definidos quando essa funcionalidade for implementada.
+Não há SQLite ou sincronização em segundo plano nesse fluxo. A referência preexistente a `sqlite-net-pcl` no projeto ainda não é utilizada.
 
 ## 11. Persistência local — Planejada
 

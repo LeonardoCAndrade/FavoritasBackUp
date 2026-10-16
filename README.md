@@ -8,7 +8,7 @@ O projeto é destinado inicialmente ao uso pessoal, sem previsão de publicaçã
 
 O FavoritasBackUp busca simplificar o backup das fotos favoritas do celular, permitindo preservar essas imagens em um armazenamento externo configurado pelo próprio usuário.
 
-O aplicativo deve identificar as imagens marcadas como favoritas na galeria nativa do Android e enviá-las para um servidor pessoal por meio de uma API HTTP.
+O aplicativo deve identificar as imagens marcadas como favoritas na galeria nativa do Android e enviá-las para um servidor pessoal por meio do WebDAV do Nextcloud utilizando HTTPS.
 
 O foco inicial é a compatibilidade com dispositivos **Samsung Galaxy**, utilizando a **Galeria Samsung** como origem das fotos favoritas.
 
@@ -53,7 +53,7 @@ A identificação das favoritas deve ocorrer automaticamente, respeitando as per
 | .NET MAUI Shell | Navegação entre páginas |
 | SecureStorage | Armazenamento seguro das configurações de acesso |
 | Android MediaStore | Consulta das imagens e identificação das favoritas |
-| HTTP API | Comunicação futura com o armazenamento pessoal |
+| HttpClient / WebDAV | Backup manual para o Nextcloud por HTTPS |
 | SQLite | Persistência futura do histórico e controle de sincronização |
 
 O projeto é desenvolvido utilizando o Visual Studio 2026.
@@ -83,32 +83,30 @@ O projeto é desenvolvido utilizando o Visual Studio 2026.
 - Acesso às configurações por meio do ícone de engrenagem.
 - Área destinada à apresentação do status da sincronização.
 
+**Leitura e backup manual das favoritas de hoje**
+
+- Permissões de leitura completas ou parciais conforme a versão do Android.
+- Consulta de favoritas pelo indicador público `IS_FAVORITE` do MediaStore (Android 11 ou superior).
+- Filtro pela captura `DATE_TAKEN`, em milissegundos Unix, convertida para o fuso local do celular. A inclusão (`DATE_ADDED`) não é usada como captura; imagens sem captura válida ficam fora do backup.
+- Envio sequencial por streaming para `FavoritasBackUp` na raiz WebDAV configurada, preservando os originais.
+- HTTP Basic com senha de aplicativo do Nextcloud, somente HTTPS, sem seguir redirecionamentos.
+- Criação por `MKCOL`; se a pasta já existe, confirmação de que o destino é uma coleção WebDAV.
+- Nomes compostos pelo SHA-256 completo do conteúdo, sem extensão ou nome original. Duas leituras por streaming (hash e envio), sem cópia integral em memória. Conteúdos idênticos compartilham o destino.
+- `PUT` com `If-None-Match: *`: HTTP 412 conta como já existente/ignorado, sem sobrescrita.
+- Resultado com favoritas de hoje, enviadas, ignoradas e falhas; prevenção de execuções simultâneas.
+- Última sincronização atualizada na tela somente quando há imagens e todas foram enviadas ou confirmadas como existentes, sem falhas. Esse horário não é persistido entre reinicializações.
+- Nenhuma foto ou miniatura é exibida.
+
 ### Em desenvolvimento
 
-**Leitura das fotos favoritas**
-
-- Solicitação das permissões de leitura de imagens.
-- Consulta às imagens disponíveis por meio do Android MediaStore.
-- Identificação das imagens marcadas como favoritas.
-- Exibição da quantidade de imagens encontradas para validar a leitura.
-
-Nesta etapa, nenhuma imagem é enviada para a nuvem.
+- Validação em dispositivo Samsung real e servidor Nextcloud.
 
 ### Planejadas
 
-**Backup para a nuvem**
+**Histórico de sincronização**
 
-- Comunicação com o serviço HTTP configurado.
-- Autenticação utilizando as credenciais armazenadas.
-- Envio das imagens favoritas.
-- Tratamento de falhas de comunicação.
-
-**Controle de sincronização**
-
-- Identificação de imagens já enviadas.
-- Prevenção de backups duplicados.
-- Persistência local do histórico de sincronização.
-- Registro de resultados e falhas.
+- Persistência local do histórico e registro de resultados.
+- Controle de sincronização além da condição de existência no servidor.
 
 **Sincronização automática**
 
@@ -140,7 +138,7 @@ O acesso às fotos depende das permissões concedidas pelo usuário e deve ser l
 
 As imagens não devem ser exibidas na interface nem compartilhadas com serviços externos diferentes do armazenamento configurado pelo usuário.
 
-A comunicação com o servidor deverá utilizar HTTPS em ambientes reais para proteger credenciais e dados durante a transferência.
+A comunicação exige HTTPS para proteger credenciais e dados. Redirecionamentos são recusados; configure diretamente a URL WebDAV final e utilize um certificado confiável no celular.
 
 ## Limitações conhecidas
 
@@ -151,6 +149,18 @@ Embora o Android ofereça um indicador público para imagens favoritas, nem todo
 Por esse motivo, a compatibilidade com a Galeria Samsung precisa ser validada em um dispositivo real.
 
 O acesso às imagens também está sujeito às permissões e restrições da versão do Android instalada.
+
+## Configuração do Nextcloud
+
+Na ConfigPage, informe a URL WebDAV completa da raiz de arquivos do usuário, por exemplo `https://nuvem.exemplo/remote.php/dav/files/usuario/`, o usuário e uma **senha de aplicativo** gerada no Nextcloud. Instalações em subdiretórios devem incluir esse prefixo na URL.
+
+Sincronizar consulta as favoritas capturadas no dia local no início da operação. Permissões parciais limitam os resultados às imagens autorizadas. Em caso de interrupção, os arquivos já enviados permanecem no servidor; uma nova tentativa ignora os existentes.
+
+## Validação local
+
+- Android: `dotnet build FavoritasBackUp.csproj -f net10.0-android --no-restore -v minimal`.
+- Verificações automatizadas sem dependências adicionais: `dotnet run --project tests/WebDavChecks/WebDavChecks.csproj`.
+- Os testes usam transporte HTTP e biblioteca simulados; não substituem validação das permissões/MediaStore em Android nem integração com um Nextcloud real.
 
 ## Documentação
 
@@ -164,4 +174,4 @@ O FavoritasBackUp está em desenvolvimento.
 
 A configuração inicial, o armazenamento seguro das credenciais e a navegação inteligente já estão implementados.
 
-A próxima etapa é validar a identificação das fotos favoritas na Galeria Samsung antes de iniciar o desenvolvimento do processo de backup para a nuvem.
+O primeiro backup manual das favoritas capturadas hoje para o Nextcloud está implementado. A compatibilidade com a Galeria Samsung e o envio para um servidor real ainda precisam de validação em dispositivo.

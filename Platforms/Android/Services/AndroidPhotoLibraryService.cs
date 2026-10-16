@@ -8,6 +8,26 @@ namespace FavoritasBackUp.Platforms.Android.Services;
 
 public sealed class AndroidPhotoLibraryService : IPhotoLibraryService
 {
+    public Task<Stream> OpenReadAsync(PhotoInfo photo, CancellationToken cancellationToken = default) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                using var uri = global::Android.Net.Uri.Parse(photo.ContentUri);
+                return global::Android.App.Application.Context.ContentResolver?.OpenInputStream(uri!)
+                    ?? throw new IOException("Não foi possível abrir a imagem.");
+            }
+            catch (Java.Lang.SecurityException exception)
+            {
+                throw new UnauthorizedAccessException("O acesso à imagem foi revogado.", exception);
+            }
+            catch (Java.IO.FileNotFoundException exception)
+            {
+                throw new IOException("A imagem não está mais disponível.", exception);
+            }
+        }, cancellationToken);
+
     public Task<IReadOnlyList<PhotoInfo>> GetFavoritePhotosAsync(CancellationToken cancellationToken = default) =>
         Task.Run<IReadOnlyList<PhotoInfo>>(() => ReadFavorites(cancellationToken), cancellationToken);
 
@@ -27,6 +47,7 @@ public sealed class AndroidPhotoLibraryService : IPhotoLibraryService
             var nameColumn = cursor.GetColumnIndexOrThrow(MediaStore.Images.Media.InterfaceConsts.DisplayName);
             var favoriteColumn = cursor.GetColumnIndexOrThrow(MediaStore.Images.Media.InterfaceConsts.IsFavorite);
             var dateColumn = cursor.GetColumnIndexOrThrow(MediaStore.Images.Media.InterfaceConsts.DateAdded);
+            var takenColumn = cursor.GetColumnIndexOrThrow(MediaStore.Images.Media.InterfaceConsts.DateTaken);
             var photos = new List<PhotoInfo>();
             while (cursor.MoveToNext())
             {
@@ -39,13 +60,20 @@ public sealed class AndroidPhotoLibraryService : IPhotoLibraryService
                     catch (ArgumentOutOfRangeException) { /* Invalid provider metadata: keep the date unknown. */ }
                 }
                 using var uri = ContentUris.WithAppendedId(collection, id);
+                DateTime? taken = null;
+                if (!cursor.IsNull(takenColumn) && cursor.GetLong(takenColumn) > 0)
+                {
+                    try { taken = DateTimeOffset.FromUnixTimeMilliseconds(cursor.GetLong(takenColumn)).UtcDateTime; }
+                    catch (ArgumentOutOfRangeException) { /* Unknown capture date: never substitute DATE_ADDED. */ }
+                }
                 photos.Add(new PhotoInfo
                 {
                     Id = id,
                     FileName = cursor.IsNull(nameColumn) ? string.Empty : cursor.GetString(nameColumn) ?? string.Empty,
                     ContentUri = uri?.ToString() ?? throw new InvalidOperationException("Não foi possível gerar a URI da imagem."),
                     IsFavorite = cursor.GetInt(favoriteColumn) == 1,
-                    DateAddedUtc = date
+                    DateAddedUtc = date,
+                    DateTakenUtc = taken
                 });
             }
             return photos.AsReadOnly();
@@ -65,7 +93,8 @@ public sealed class AndroidPhotoLibraryService : IPhotoLibraryService
             throw new NotSupportedException("O indicador público de favoritas requer Android 11 ou superior.");
         var projection = favorites && OperatingSystem.IsAndroidVersionAtLeast(30)
             ? new[] { MediaStore.Images.Media.InterfaceConsts.Id, MediaStore.Images.Media.InterfaceConsts.DisplayName,
-                MediaStore.Images.Media.InterfaceConsts.IsFavorite, MediaStore.Images.Media.InterfaceConsts.DateAdded }
+                MediaStore.Images.Media.InterfaceConsts.IsFavorite, MediaStore.Images.Media.InterfaceConsts.DateAdded,
+                MediaStore.Images.Media.InterfaceConsts.DateTaken }
             : new[] { MediaStore.Images.Media.InterfaceConsts.Id };
         try
         {

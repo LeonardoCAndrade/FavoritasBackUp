@@ -22,6 +22,12 @@ namespace FavoritasBackUp
             builder.Services.AddSingleton<CloudConfigurationService>();
 #if ANDROID
             builder.Services.AddSingleton<IPhotoLibraryService, FavoritasBackUp.Platforms.Android.Services.AndroidPhotoLibraryService>();
+            builder.Services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false
+            }) { Timeout = TimeSpan.FromMinutes(10) });
+            builder.Services.AddSingleton<INextcloudBackupService, NextcloudBackupService>();
 #endif
             builder.Services.AddTransient<ConfigPage>();
             builder.Services.AddTransient<SyncPage>();
