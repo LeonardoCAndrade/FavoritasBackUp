@@ -152,7 +152,22 @@ O acesso às imagens também está sujeito às permissões e restrições da ver
 
 ## Configuração do Nextcloud
 
-Na ConfigPage, informe a URL WebDAV completa da raiz de arquivos do usuário, por exemplo `https://nuvem.exemplo/remote.php/dav/files/usuario/`, o usuário e uma **senha de aplicativo** gerada no Nextcloud. Instalações em subdiretórios devem incluir esse prefixo na URL.
+O servidor Nextcloud está em Docker Desktop no Windows, com acesso inicialmente restrito à rede doméstica. O endereço HTTPS é `https://nextcloud.home.arpa:8443`. O nome `nextcloud.home.arpa` é associado ao IP local do servidor, atualmente `192.168.15.7` (dinâmico; reserva DHCP ainda pendente).
+
+O Caddy, em um contêiner Docker separado, realiza a terminação TLS na porta HTTPS 8443 e encaminha as requisições ao Nextcloud pela porta HTTP interna 8080:
+
+```caddyfile
+https://nextcloud.home.arpa:8443 {
+    tls internal
+    reverse_proxy host.docker.internal:8080
+}
+```
+
+O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade local precisa ser confiável nos dispositivos clientes, mantendo a validação de certificados TLS ativa.
+
+Na ConfigPage, informe a URL WebDAV completa `https://nextcloud.home.arpa:8443/remote.php/dav/files/USUARIO/`, substituindo `USUARIO` pelo usuário configurado no Nextcloud, o usuário e uma **senha de aplicativo** gerada no Nextcloud. Instalações em subdiretórios devem incluir esse prefixo na URL.
+
+O acesso HTTPS foi validado no Windows. A configuração de confiança TLS no Android e no aplicativo .NET MAUI, assim como a resolução DNS do domínio local no Android, ainda está pendente. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
 
 Sincronizar consulta as favoritas capturadas no dia local no início da operação. Permissões parciais limitam os resultados às imagens autorizadas. Em caso de interrupção, os arquivos já enviados permanecem no servidor; uma nova tentativa ignora os existentes.
 

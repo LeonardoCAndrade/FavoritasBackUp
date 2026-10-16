@@ -271,6 +271,19 @@ Fluxo:
 
 O `HttpClient` singleton é registrado no `MauiProgram.cs` com `SocketsHttpHandler`, sem redirecionamentos nem cookies e limite de dez minutos por requisição. Credenciais são colocadas em cada requisição, sem cabeçalho global compartilhado. A validação TLS permanece ativa.
 
+Na infraestrutura atual, o Nextcloud está em Docker Desktop no Windows e é acessado por `https://nextcloud.home.arpa:8443`, inicialmente apenas na rede doméstica. O Caddy roda em um contêiner Docker separado, termina o TLS na porta 8443 e encaminha as requisições ao Nextcloud por HTTP na porta interna 8080, com a seguinte configuração:
+
+```caddyfile
+https://nextcloud.home.arpa:8443 {
+    tls internal
+    reverse_proxy host.docker.internal:8080
+}
+```
+
+O endpoint WebDAV é `https://nextcloud.home.arpa:8443/remote.php/dav/files/USUARIO/`, em que `USUARIO` representa o usuário configurado no Nextcloud. O nome `nextcloud.home.arpa` é associado ao IP local do servidor, atualmente `192.168.15.7` (dinâmico; reserva DHCP ainda pendente).
+
+O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade precisa ser confiável nos dispositivos clientes, sem desabilitar a validação TLS. O acesso HTTPS foi validado no Windows; a confiança TLS no Android e no aplicativo .NET MAUI e a resolução DNS do domínio local no Android ainda estão pendentes. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
+
 O serviço bloqueia execuções simultâneas; a SyncPage também desabilita o botão e mostra “Enviando imagens...”. Sair da página cancela a operação e libera os streams. A interface apresenta o resultado e indica acesso parcial. O horário de última sincronização é atualizado somente para um conjunto não vazio sem falhas (envios ou arquivos existentes), permanecendo em memória na página. Nenhum original é alterado ou excluído.
 
 Não há SQLite ou sincronização em segundo plano nesse fluxo. A referência preexistente a `sqlite-net-pcl` no projeto ainda não é utilizada.
