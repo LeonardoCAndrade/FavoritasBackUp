@@ -269,20 +269,20 @@ Fluxo:
 5. Calcular SHA-256 do conteúdo por streaming e usar o hash completo como nome seguro e estável, sem extensão. Abrir novamente a URI para enviar sequencialmente por streaming usando `PUT` e `If-None-Match: *`. HTTP 412 conta como ignorado; conteúdos idênticos compartilham o destino.
 6. Contabilizar erros por imagem, mantendo os envios anteriores. Falhas na configuração/pasta contabilizam todas as candidatas como falhas. Uma queda de conexão após envio pode deixar o arquivo no servidor; a próxima tentativa o reconhecerá pela condição HTTP.
 
-O `HttpClient` singleton é registrado no `MauiProgram.cs` com `SocketsHttpHandler`, sem redirecionamentos nem cookies e limite de dez minutos por requisição. Credenciais são colocadas em cada requisição, sem cabeçalho global compartilhado. A validação TLS permanece ativa.
+O `HttpClient` singleton é registrado no `MauiProgram.cs` com `Xamarin.Android.Net.AndroidMessageHandler`, utilizando o transporte nativo e a configuração de segurança de rede do Android, sem redirecionamentos nem cookies e limite de dez minutos por requisição. Credenciais são colocadas em cada requisição, sem cabeçalho global compartilhado. A validação TLS permanece ativa.
 
-Na infraestrutura atual, o Nextcloud está em Docker Desktop no Windows e é acessado por `https://nextcloud.home.arpa:8443`, inicialmente apenas na rede doméstica. O Caddy roda em um contêiner Docker separado, termina o TLS na porta 8443 e encaminha as requisições ao Nextcloud por HTTP na porta interna 8080, com a seguinte configuração:
+Na infraestrutura atual, o Nextcloud está em Docker Desktop no Windows e é acessado por `https://192.168.15.7:8443`, inicialmente apenas na rede doméstica. O Caddy roda em um contêiner Docker separado, termina o TLS na porta 8443 e encaminha as requisições ao Nextcloud por HTTP na porta interna 8080, com a seguinte configuração:
 
 ```caddyfile
-https://nextcloud.home.arpa:8443 {
+https://192.168.15.7:8443 {
     tls internal
     reverse_proxy host.docker.internal:8080
 }
 ```
 
-O endpoint WebDAV é `https://nextcloud.home.arpa:8443/remote.php/dav/files/USUARIO/`, em que `USUARIO` representa o usuário configurado no Nextcloud. O nome `nextcloud.home.arpa` é associado ao IP local do servidor, atualmente `192.168.15.7` (dinâmico; reserva DHCP ainda pendente).
+O endpoint WebDAV é `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/`, em que `USUARIO` representa o usuário configurado no Nextcloud. O IP local atual é `192.168.15.7`; a URL permanece configurável pelo usuário.
 
-O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade precisa ser confiável nos dispositivos clientes, sem desabilitar a validação TLS. O acesso HTTPS foi validado no Windows; a confiança TLS no Android e no aplicativo .NET MAUI e a resolução DNS do domínio local no Android ainda estão pendentes. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
+O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade precisa ser confiável nos dispositivos clientes, sem desabilitar a validação TLS. Conforme informado pelo usuário, a CA raiz já está instalada no Android e o navegador do Galaxy S26 acessa o Nextcloud corretamente por HTTPS. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
 
 O serviço bloqueia execuções simultâneas; a SyncPage também desabilita o botão e mostra “Enviando imagens...”. Sair da página cancela a operação e libera os streams. A interface apresenta o resultado e indica acesso parcial. O horário de última sincronização é atualizado somente para um conjunto não vazio sem falhas (envios ou arquivos existentes), permanecendo em memória na página. Nenhum original é alterado ou excluído.
 
@@ -331,3 +331,20 @@ Diretrizes:
 - Manter a documentação sincronizada com alterações arquiteturais relevantes.
 
 Não é obrigatório utilizar MVVM, Clean Architecture ou outros padrões adicionais enquanto a complexidade do projeto não justificar sua adoção.
+## HTTPS no Android para o teste local
+
+O aplicativo usa `Xamarin.Android.Net.AndroidMessageHandler` com o gerenciador de confiança e a verificação de hostname padrão do Android. O manifesto referencia `Platforms/Android/Resources/xml/network_security_config.xml`, que preserva as CAs do sistema e proíbe HTTP sem criptografia.
+
+A seção `debug-overrides` adiciona confiança nas CAs instaladas pelo usuário somente quando `android:debuggable=true` (build Debug para desenvolvimento/teste). Essa confiança abrange todas as CAs do usuário: não há uma cópia verificada do certificado raiz específico do Caddy no repositório para incorporá-lo como recurso. Release mantém somente as CAs do sistema. Não há callback que aceite certificados inválidos. O certificado do servidor precisa conter o endereço configurado no SAN. As outras plataformas não são alteradas.
+
+O tratamento de erros diferencia TLS/HTTPS, conexão/tempo limite, HTTP 401 (credenciais), 403 (permissões) e 404 (destino WebDAV). Falhas de leitura/envio continuam contabilizadas por imagem sem declarar sucesso.
+
+### Primeiro teste no Samsung Galaxy S26
+
+1. Instalar/executar em **Debug**, na mesma rede doméstica do servidor, com a CA raiz do Caddy instalada no Android.
+2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
+3. Conceder acesso às imagens; acesso parcial limita os resultados às imagens autorizadas.
+4. Marcar uma foto capturada hoje como favorita. Manter uma foto de outro dia favorita e uma de hoje não favorita para conferir que ficam de fora. Tocar em **Sincronizar**.
+5. Conferir os contadores e os arquivos em `FavoritasBackUp` no Nextcloud (nomes SHA-256 sem extensão). Repetir para confirmar que arquivos existentes são ignorados sem sobrescrita.
+
+A configuração está implementada; a validação em dispositivo e Nextcloud reais continua em desenvolvimento. Os testes simulados não comprovam a confiança TLS no celular nem a integração da Galeria Samsung com `IS_FAVORITE`.

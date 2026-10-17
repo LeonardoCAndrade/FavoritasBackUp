@@ -45,7 +45,7 @@ Check(result.Total == 3 && result.Uploaded == 1 && result.Skipped == 1 && result
 Check(library.Opened == 6 && library.Disposed == 6, "Streams must be disposed");
 Console.WriteLine("PASS local capture date, unknown date exclusion, counts, Basic, PUT condition, safe stable names, stream disposal");
 
-foreach (var status in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.Redirect, HttpStatusCode.Conflict })
+foreach (var status in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.NotFound, HttpStatusCode.Redirect, HttpStatusCode.Conflict })
 {
     var calls = 0;
     var failure = new NextcloudBackupService(new HttpClient(new Handler(_ =>
@@ -55,6 +55,7 @@ foreach (var status in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbi
     })), config, library);
     var failed = await failure.BackupTodayAsync();
     Check(failed.Failed == 3 && failed.Uploaded == 0 && calls == 1, "Folder error must prevent PUT");
+    Check(failed.Error?.Contains(((int)status).ToString()) == true, "HTTP error must identify its status");
 }
 Console.WriteLine("PASS authentication, HTTP errors and redirect response accounting");
 
@@ -88,6 +89,17 @@ Console.WriteLine("PASS insecure URL refusal");
 await config.SaveAsync(new() { Url = "https://cloud.example/", Username = "user", Password = "app-password" });
 var offline = new NextcloudBackupService(new HttpClient(new Handler(_ => throw new HttpRequestException("offline"))), config, library);
 Check((await offline.BackupTodayAsync()).Failed == 3, "Connection failure accounting");
+foreach (var exception in new Exception[] {
+    new HttpRequestException(HttpRequestError.SecureConnectionError, "TLS"),
+    new HttpRequestException("TLS", new System.Security.Authentication.AuthenticationException()) })
+{
+    var tls = new NextcloudBackupService(new HttpClient(new Handler(_ => throw exception)), config, library);
+    var tlsResult = await tls.BackupTodayAsync();
+    Check(tlsResult.Failed == 3 && tlsResult.Uploaded == 0 && tlsResult.Error?.Contains("TLS/HTTPS") == true,
+        "TLS failure must be distinct and prevent upload");
+    Check(tlsResult.Error?.Contains("app-password") == false, "Error must not expose credentials");
+}
+Console.WriteLine("PASS distinct TLS errors without successful uploads or credentials in messages");
 var entered = new TaskCompletionSource();
 var release = new TaskCompletionSource();
 var concurrent = new NextcloudBackupService(new HttpClient(new Handler(async _ =>

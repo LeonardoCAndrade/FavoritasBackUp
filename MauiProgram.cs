@@ -22,7 +22,8 @@ namespace FavoritasBackUp
             builder.Services.AddSingleton<CloudConfigurationService>();
 #if ANDROID
             builder.Services.AddSingleton<IPhotoLibraryService, FavoritasBackUp.Platforms.Android.Services.AndroidPhotoLibraryService>();
-            builder.Services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
+            // Uses Android's default TLS trust manager and Network Security Configuration.
+            builder.Services.AddSingleton(_ => new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler
             {
                 AllowAutoRedirect = false,
                 UseCookies = false

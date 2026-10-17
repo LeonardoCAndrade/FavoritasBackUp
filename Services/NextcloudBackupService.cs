@@ -128,13 +128,34 @@ public sealed class NextcloudBackupService(
             throw new HttpRequestException("O servidor recusou a operação.", null, response.StatusCode);
     }
 
+    private static bool IsTlsError(Exception exception)
+    {
+        for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
+        {
+            if (cause is System.Security.Authentication.AuthenticationException ||
+                cause is HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError })
+                return true;
+#if ANDROID
+            if (cause is Javax.Net.Ssl.SSLException or Java.Security.Cert.CertificateException)
+                return true;
+#endif
+        }
+        return false;
+    }
+
     private static string DescribeError(Exception exception) => exception switch
     {
-        HttpRequestException { StatusCode: HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden } =>
-            "Acesso recusado pelo Nextcloud. Verifique o usuário, a senha de aplicativo e a permissão de escrita.",
+        _ when IsTlsError(exception) =>
+            "Falha de segurança TLS/HTTPS. Verifique a confiança na CA do Caddy, a validade do certificado e se ele corresponde ao endereço configurado.",
+        HttpRequestException { StatusCode: HttpStatusCode.Unauthorized } =>
+            "HTTP 401: credenciais inválidas. Verifique o usuário e a senha de aplicativo do Nextcloud.",
+        HttpRequestException { StatusCode: HttpStatusCode.Forbidden } =>
+            "HTTP 403: acesso negado. Verifique a permissão de escrita no Nextcloud.",
+        HttpRequestException { StatusCode: HttpStatusCode.NotFound } =>
+            "HTTP 404: destino WebDAV não encontrado. Revise a URL completa, incluindo o usuário no caminho.",
         HttpRequestException { StatusCode: not null } http =>
             $"O servidor retornou HTTP {(int)http.StatusCode.Value}. Revise a URL WebDAV e a disponibilidade do Nextcloud. Redirecionamentos não são seguidos.",
-        HttpRequestException or OperationCanceledException => "Falha de conexão ou tempo limite. Verifique a rede e o certificado HTTPS e tente novamente.",
+        HttpRequestException or OperationCanceledException => "Falha de conexão ou tempo limite. Verifique a rede e a disponibilidade do servidor e tente novamente.",
         UnauthorizedAccessException => "O acesso às imagens foi negado ou revogado. Revise as permissões do Android.",
         IOException => "Não foi possível ler ou transferir uma imagem. Tente novamente.",
         _ => "Não foi possível preparar ou concluir o backup. Revise a configuração e tente novamente."
