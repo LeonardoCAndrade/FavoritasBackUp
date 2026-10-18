@@ -82,7 +82,7 @@ O projeto é desenvolvido utilizando o Visual Studio 2026.
 - Botão para iniciar o processo de sincronização.
 - Acesso às configurações por meio do ícone de engrenagem.
 - Área destinada à apresentação do status da sincronização.
-- Botão temporário **Testar conexão**: GET autenticado ao endpoint OCS de usuário, sem acessar fotos, criar pastas ou enviar arquivos. Valida HTTP e `ocs.meta` e apresenta detalhes de falhas com credenciais ocultadas.
+- Botão **Testar conexão**: GET autenticado ao endpoint OCS de usuário, sem acessar fotos, criar pastas ou enviar arquivos. Valida HTTP, `ocs.meta` e a identificação do usuário autenticado. Exibe carregamento e mensagens específicas para falhas de autenticação, conexão, certificado e tempo limite.
 
 **Leitura e backup manual das favoritas de hoje**
 
@@ -196,7 +196,7 @@ O primeiro backup manual das favoritas capturadas hoje para o Nextcloud está im
 
 A troca para `SocketsHttpHandler` foi revertida. A limitação de métodos WebDAV (`MKCOL`/`PROPFIND`) do handler Android permanece pendente; **Testar conexão** utiliza somente `GET` e não comprova o funcionamento do backup.
 
-Para testar a conexão no Galaxy S26, execute em **Debug**, na mesma rede do Caddy/Nextcloud e com a CA raiz local instalada. Salve a URL WebDAV, usuário e senha de aplicativo nas configurações e toque em **Testar conexão** na tela de sincronização. Para a URL atual, a requisição será `GET https://192.168.15.7:8443/ocs/v2.php/cloud/user?format=json`. Não são necessárias permissões de fotos. O sucesso exige HTTP 2xx e `ocs.meta.status=ok`, `statuscode=200`. Falhas mostram HTTP/OCS ou a cadeia de exceções; o diagnóstico completo com stack traces e credenciais ocultadas aparece na saída Debug do Visual Studio. O teste tem limite de 30 segundos e é cancelado ao sair da tela. A validação com servidor/dispositivo reais continua pendente.
+Para testar a conexão no Galaxy S26, execute em **Debug**, na mesma rede do Caddy/Nextcloud e com a CA raiz local instalada. Salve a URL WebDAV, usuário e senha de aplicativo nas configurações e toque em **Testar conexão** na tela de sincronização. Para a URL atual, a requisição será `GET https://192.168.15.7:8443/ocs/v2.php/cloud/user?format=json`. Não são necessárias permissões de fotos. O sucesso exige HTTP 2xx, `ocs.meta.status=ok`, `statuscode=200` e `ocs.data.id` preenchido. Falhas mostram mensagens compreensíveis; o diagnóstico completo com stack traces e credenciais ocultadas aparece na saída Debug do Visual Studio. O teste tem limite de 30 segundos e é cancelado ao sair da tela. Conforme informado pelo usuário, o teste de conexão foi validado com sucesso no Samsung Galaxy S26 com HTTPS e autenticação no Nextcloud. As melhorias posteriores precisam de nova conferência visual no dispositivo.
 
 O aplicativo usa `Xamarin.Android.Net.AndroidMessageHandler` com o gerenciador de confiança e a verificação de hostname padrão do Android. O manifesto referencia `Platforms/Android/Resources/xml/network_security_config.xml`, que preserva as CAs do sistema e proíbe HTTP sem criptografia.
 

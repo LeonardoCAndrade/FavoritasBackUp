@@ -11,6 +11,8 @@ static class ConnectionChecks
             if (!value) throw new Exception(message);
         }
         var config = new CloudConfigurationService(new Storage());
+        using (var client = new HttpClient(new Handler(_ => throw new Exception("Missing configuration must not send"))))
+            Check((await new NextcloudConnectionService(client, config).TestAsync()).Contains("Revise a configuração"), "Missing configuration");
         foreach (var prefix in new[] { "", "/nextcloud" })
         {
             await config.SaveAsync(new() { Url = $"https://cloud.example:8443{prefix}/remote.php/dav/files/user/", Username = "user", Password = "app-password" });
@@ -25,7 +27,7 @@ static class ConnectionChecks
                 Check(request.Headers.GetValues("OCS-APIRequest").Single() == "true", "OCS header");
                 Check(request.Headers.Accept.ToString() == "application/json", "OCS Accept");
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                { Content = new StringContent("{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200}}}") });
+                { Content = new StringContent("{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200},\"data\":{\"id\":\"canonical-user\"}}}") });
             }));
             Check((await new NextcloudConnectionService(client, config).TestAsync()).StartsWith("Conexão e autenticação"), "OCS success");
             Check(calls == 1, "Exactly one GET expected");
@@ -37,7 +39,9 @@ static class ConnectionChecks
         }
         foreach (var body in new[] { "{}", "null", "[]", "not json", "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":997}}}",
             "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":100}}}",
-            "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":200}}}" })
+            "{\"ocs\":{\"meta\":{\"status\":\"failure\",\"statuscode\":200}}}",
+            "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200}}}",
+            "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200},\"data\":{\"id\":\"\"}}}" })
         {
             using var client = new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) })));
             Check(!(await new NextcloudConnectionService(client, config).TestAsync()).StartsWith("Conexão e autenticação"), "Malformed/failed OCS must not succeed");
@@ -47,7 +51,7 @@ static class ConnectionChecks
             new System.Security.Authentication.AuthenticationException("inner user " + Convert.ToBase64String(Encoding.UTF8.GetBytes("user:app-password")))))))
         {
             var result = await new NextcloudConnectionService(client, config) { WriteDiagnostic = log.Add }.TestAsync();
-            Check(result.Contains("AuthenticationException") && log.Any(line => line.Contains("AuthenticationException")), "Inner exception diagnosis");
+            Check(result.Contains("certificado HTTPS") && log.Any(line => line.Contains("AuthenticationException")), "TLS message and inner exception diagnosis");
             Check(!string.Join("", log).Contains("app-password") && !result.Contains("app-password") &&
                 !string.Join("", log).Contains(Convert.ToBase64String(Encoding.UTF8.GetBytes("user:app-password"))), "Credentials in diagnostics");
         }
@@ -58,6 +62,20 @@ static class ConnectionChecks
             Check((await new NextcloudConnectionService(client, config).TestAsync()).Contains("URL WebDAV"), "Invalid URL validation");
         }
         await config.SaveAsync(new() { Url = "https://cloud.example/remote.php/dav/files/user/", Username = "user", Password = "app-password" });
+        foreach (var failure in new[]
+        {
+            new HttpRequestException("offline"),
+            new HttpRequestException(HttpRequestError.SecureConnectionError, "certificate")
+        })
+        {
+            using var client = new HttpClient(new Handler(_ => throw failure));
+            var service = new NextcloudConnectionService(client, config);
+            var expected = failure.HttpRequestError == HttpRequestError.SecureConnectionError ? "certificado HTTPS" : "servidor está disponível";
+            Check((await service.TestAsync()).Contains(expected), "Distinct connection/certificate error");
+            Check((await service.TestAsync()).Contains(expected), "Retry after failure");
+        }
+        using (var client = new HttpClient(new TimeoutHandler()) { Timeout = TimeSpan.FromMilliseconds(50) })
+            Check((await new NextcloudConnectionService(client, config).TestAsync()).Contains("tempo limite"), "HTTP timeout");
         using (var client = new HttpClient(new Handler(_ => throw new OperationCanceledException())))
         using (var cancellation = new CancellationTokenSource())
         {
@@ -65,6 +83,15 @@ static class ConnectionChecks
             try { await new NextcloudConnectionService(client, config).TestAsync(cancellation.Token); throw new Exception("Cancellation ignored"); }
             catch (OperationCanceledException) { }
         }
-        Console.WriteLine("PASS OCS GET only, endpoint/prefix, Basic/headers, HTTP/OCS failures, invalid JSON/URL, inner exceptions, redaction and cancellation");
+        Console.WriteLine("PASS OCS GET only, authenticated user, endpoint/prefix, Basic/headers, HTTP/OCS failures, invalid JSON/URL, missing configuration, connection/TLS errors, timeout, retry, redaction and cancellation");
+    }
+
+    private sealed class TimeoutHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Expected cancellation");
+        }
     }
 }

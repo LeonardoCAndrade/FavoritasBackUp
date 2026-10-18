@@ -39,6 +39,7 @@ public partial class SyncPage : ContentPage
         _connectionCancellation = cancellation;
         TestConnectionButton.IsEnabled = false;
         TestConnectionButton.Text = "Testando conexão...";
+        ConnectionIndicator.IsVisible = ConnectionIndicator.IsRunning = true;
         try
         {
             var message = _connectionService is null
@@ -53,6 +54,7 @@ public partial class SyncPage : ContentPage
             _connectionCancellation = null;
             TestConnectionButton.IsEnabled = true;
             TestConnectionButton.Text = "Testar conexão";
+            ConnectionIndicator.IsVisible = ConnectionIndicator.IsRunning = false;
         }
     }
 

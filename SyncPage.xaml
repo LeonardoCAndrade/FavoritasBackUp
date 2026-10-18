@@ -112,6 +112,13 @@
                     Clicked="OnTestConnectionClicked" />
 
                 <ActivityIndicator
+                    x:Name="ConnectionIndicator"
+                    IsVisible="False"
+                    IsRunning="False"
+                    Color="#2459A9"
+                    SemanticProperties.Description="Testando conexão com o Nextcloud" />
+
+                <ActivityIndicator
                     x:Name="ReadIndicator"
                     IsVisible="False"
                     IsRunning="False"

@@ -68,23 +68,40 @@ public sealed class NextcloudConnectionService(
                 WriteDiagnostic(message);
                 return message;
             }
-            return "Conexão e autenticação com o Nextcloud validadas (HTTP e OCS 200).";
+            if (!ocs.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object ||
+                !data.TryGetProperty("id", out var id) || id.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(id.GetString()))
+                return "Resposta OCS inválida: o servidor não identificou o usuário autenticado.";
+            return "Conexão e autenticação com o Nextcloud realizadas com sucesso.";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
-            var details = new List<string>();
             for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
             {
                 // Before configuration is loaded, omit arbitrary storage exception text.
                 var detail = $"{cause.GetType().FullName} (0x{cause.HResult:X8})";
                 if (config is not null) detail += ": " + cause.Message;
                 detail = Redact(detail, config, basic);
-                details.Add(detail);
                 WriteDiagnostic(detail + "\n" + Redact(cause.StackTrace ?? "", config, basic));
             }
-            return "Falha no teste de conexão. Verifique HTTPS/CA do Caddy, rede e credenciais.\n" +
-                string.Join("\nCausa: ", details);
+            for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
+            {
+                if (cause is System.Security.Authentication.AuthenticationException ||
+                    cause is HttpRequestException { HttpRequestError: HttpRequestError.SecureConnectionError })
+                    return "Falha no certificado HTTPS. Verifique a CA do Caddy, a validade do certificado e o endereço configurado.";
+#if ANDROID
+                if (cause is Javax.Net.Ssl.SSLException or Java.Security.Cert.CertificateException)
+                    return "Falha na conexão segura HTTPS. Verifique a CA do Caddy e o certificado do servidor.";
+#endif
+            }
+            return exception switch
+            {
+                OperationCanceledException => "O teste de conexão excedeu o tempo limite. Verifique a rede e tente novamente.",
+                HttpRequestException or IOException => "Não foi possível conectar ao Nextcloud. Verifique a rede, o endereço e se o servidor está disponível.",
+                JsonException => "Resposta OCS inválida: o servidor não retornou um JSON válido.",
+                _ => "Não foi possível testar a conexão. Verifique as configurações salvas e tente novamente."
+            };
         }
     }
 
