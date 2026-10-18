@@ -44,6 +44,22 @@ public sealed class NextcloudBackupService(
                 await EnsureFolderAsync(folder, authorization, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (HttpRequestException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.ToString());
+
+                var inner = ex.InnerException;
+
+                while (inner != null)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"{inner.GetType().FullName}: {inner.Message}");
+
+                    inner = inner.InnerException;
+                }
+
+                throw;
+            }
             catch (Exception exception)
             {
                 return new(photos.Count, 0, 0, photos.Count, DescribeError(exception));

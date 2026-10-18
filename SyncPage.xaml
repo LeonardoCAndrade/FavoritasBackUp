@@ -104,6 +104,13 @@
                     Margin="0,12,0,0"
                     Clicked="OnSyncClicked" />
 
+                <Button
+                    x:Name="TestConnectionButton"
+                    Text="Testar conexão"
+                    BackgroundColor="#E7EFFC"
+                    TextColor="#2459A9"
+                    Clicked="OnTestConnectionClicked" />
+
                 <ActivityIndicator
                     x:Name="ReadIndicator"
                     IsVisible="False"

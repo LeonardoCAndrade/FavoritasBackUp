@@ -5,6 +5,9 @@ using FavoritasBackUp.Models;
 using FavoritasBackUp.Services;
 using Microsoft.Maui.Storage;
 
+await ConnectionChecks.RunAsync();
+if (args.Contains("--connection-only")) return;
+
 static void Check(bool condition, string message)
 {
     if (!condition) throw new Exception(message);

@@ -29,6 +29,7 @@ namespace FavoritasBackUp
                 UseCookies = false
             }) { Timeout = TimeSpan.FromMinutes(10) });
             builder.Services.AddSingleton<INextcloudBackupService, NextcloudBackupService>();
+            builder.Services.AddSingleton<NextcloudConnectionService>();
 #endif
             builder.Services.AddTransient<ConfigPage>();
             builder.Services.AddTransient<SyncPage>();

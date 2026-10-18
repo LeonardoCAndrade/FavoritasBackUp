@@ -10,22 +10,50 @@ public partial class SyncPage : ContentPage
     private readonly INextcloudBackupService? _backupService;
     private CancellationTokenSource? _backupCancellation;
     private bool _isSyncing;
+    private readonly NextcloudConnectionService? _connectionService;
+    private CancellationTokenSource? _connectionCancellation;
 
-    public SyncPage(INextcloudBackupService? backupService = null)
+    public SyncPage(INextcloudBackupService? backupService = null, NextcloudConnectionService? connectionService = null)
     {
         _backupService = backupService;
+        _connectionService = connectionService;
         InitializeComponent();
     }
 
     protected override void OnDisappearing()
     {
         _backupCancellation?.Cancel();
+        _connectionCancellation?.Cancel();
         base.OnDisappearing();
     }
 
     private async void OnSettingsClicked(object? sender, EventArgs e)
     {
         await Shell.Current.GoToAsync($"//{nameof(ConfigPage)}");
+    }
+
+    private async void OnTestConnectionClicked(object? sender, EventArgs e)
+    {
+        if (_connectionCancellation is not null) return;
+        using var cancellation = new CancellationTokenSource();
+        _connectionCancellation = cancellation;
+        TestConnectionButton.IsEnabled = false;
+        TestConnectionButton.Text = "Testando conexão...";
+        try
+        {
+            var message = _connectionService is null
+                ? "Teste disponível somente no Android."
+                : await _connectionService.TestAsync(cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            await DisplayAlertAsync("Teste de conexão", message, "OK");
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally
+        {
+            _connectionCancellation = null;
+            TestConnectionButton.IsEnabled = true;
+            TestConnectionButton.Text = "Testar conexão";
+        }
     }
 
     private async void OnSyncClicked(object? sender, EventArgs e)
