@@ -271,18 +271,11 @@ Fluxo:
 
 O `HttpClient` singleton é registrado no `MauiProgram.cs` com `Xamarin.Android.Net.AndroidMessageHandler`, utilizando o transporte nativo e a configuração de segurança de rede do Android, sem redirecionamentos nem cookies e limite de dez minutos por requisição. Credenciais são colocadas em cada requisição, sem cabeçalho global compartilhado. A validação TLS permanece ativa.
 
-Na infraestrutura atual, o Nextcloud está em Docker Desktop no Windows e é acessado por `https://192.168.15.7:8443`, inicialmente apenas na rede doméstica. O Caddy roda em um contêiner Docker separado, termina o TLS na porta 8443 e encaminha as requisições ao Nextcloud por HTTP na porta interna 8080, com a seguinte configuração:
+O endereço do Nextcloud é configurável pelo usuário. O Caddy pode realizar a terminação TLS; os exemplos utilizam o domínio fictício `cloud.example`.
 
-```caddyfile
-https://192.168.15.7:8443 {
-    tls internal
-    reverse_proxy host.docker.internal:8080
-}
-```
+O endpoint WebDAV é `https://cloud.example/remote.php/dav/files/USUARIO/FavoritasBackUp/`, em que `USUARIO` representa o usuário configurado no Nextcloud. A pasta FavoritasBackUp deve existir previamente, criada manualmente no Nextcloud. A URL permanece configurável pelo usuário, inclusive para outra pasta; configurações antigas apontando à raiz devem ser editadas para o destino desejado.
 
-O endpoint WebDAV é `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, em que `USUARIO` representa o usuário configurado no Nextcloud. A pasta FavoritasBackUp deve existir previamente, criada manualmente no Nextcloud. A URL permanece configurável pelo usuário, inclusive para outra pasta; configurações antigas apontando à raiz devem ser editadas para o destino desejado. O IP local atual é `192.168.15.7`.
-
-O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade precisa ser confiável nos dispositivos clientes, sem desabilitar a validação TLS. Conforme informado pelo usuário, a CA raiz já está instalada no Android e o navegador do Galaxy S26 acessa o Nextcloud corretamente por HTTPS. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
+Se o Caddy utilizar uma autoridade certificadora local (`tls internal`), essa autoridade deve ser confiável no dispositivo, sem desabilitar a validação TLS. A validação do backup por HTTPS deve ser realizada em dispositivo Android com um certificado confiável.
 
 O serviço bloqueia execuções simultâneas; a SyncPage também desabilita o botão e mostra “Enviando imagens...”. Sair da página cancela a operação e libera os streams. A interface apresenta o resultado e indica acesso parcial. O horário de última sincronização é atualizado somente para um conjunto não vazio sem falhas (envios ou arquivos existentes), permanecendo em memória na página. Nenhum original é alterado ou excluído.
 
@@ -296,7 +289,7 @@ O sucesso exige HTTP 2xx, `ocs.meta.status=ok`, código OCS v2 `200` e `ocs.data
 
 Exceções e `InnerException` são percorridas: tipo, HResult, mensagem e stack trace são registrados na saída Debug, com usuário, senha, URL salva e token Basic (incluindo representações escapadas) ocultados. A interface apresenta mensagens específicas para falhas de certificado/TLS, conexão, timeout, HTTP, OCS e JSON inválido; os detalhes técnicos ficam no diagnóstico. O botão permanece abaixo de Sincronizar, desabilitado durante o teste e acompanhado de indicador de carregamento, sendo reabilitado no finally. Antes de carregar as credenciais, mensagens arbitrárias de exceções de armazenamento são omitidas. Corpos OCS e mensagens fornecidas pelo servidor não são registrados, para evitar expor dados da conta. O serviço não altera o estado da sincronização.
 
-Os testes OCS simulam transporte e verificam GET exclusivo, URL com prefixo/porta, autenticação, headers, erros HTTP/OCS, JSON/URL inválidos, cancelamento, usuário autenticado, ausência de configurações, indisponibilidade, erro TLS, timeout, novas tentativas e ocultação de credenciais na cadeia de exceções. O timeout é exercitado com transporte que aguarda cancelamento e limite curto do HttpClient, sem esperar 30 segundos. Não substituem integração real com Nextcloud nem validação TLS no Galaxy. Conforme informado pelo usuário, o teste HTTPS/autenticado já funcionou no Galaxy S26; as melhorias de interface ainda precisam de conferência no aparelho. A administração de diretórios e o bloco de diagnóstico que relançava exceções HTTP dessa etapa foram removidos. A suíte de backup valida somente PUT, caminho final com prefixo/porta/espaços codificados, barras finais, seleção do dia, não sobrescrita, contadores e falhas HTTP/TLS/conexão, sem servidor real.
+Os testes OCS simulam transporte e verificam GET exclusivo, URL com prefixo/porta, autenticação, headers, erros HTTP/OCS, JSON/URL inválidos, cancelamento, usuário autenticado, ausência de configurações, indisponibilidade, erro TLS, timeout, novas tentativas e ocultação de credenciais na cadeia de exceções. O timeout é exercitado com transporte que aguarda cancelamento e limite curto do HttpClient, sem esperar 30 segundos. Não substituem integração real com Nextcloud nem validação TLS em dispositivo Android. O teste HTTPS/autenticado foi validado em dispositivo Android; as melhorias de interface ainda precisam de conferência no dispositivo. A administração de diretórios e o bloco de diagnóstico que relançava exceções HTTP dessa etapa foram removidos. A suíte de backup valida somente PUT, caminho final com prefixo/porta/espaços codificados, barras finais, seleção do dia, não sobrescrita, contadores e falhas HTTP/TLS/conexão, sem servidor real.
 
 ## 11. Persistência local — Planejada
 
@@ -349,10 +342,10 @@ A seção `debug-overrides` adiciona confiança nas CAs instaladas pelo usuário
 
 O tratamento de erros diferencia TLS/HTTPS, conexão/tempo limite, HTTP 401 (credenciais), 403 (permissões) e 404 (destino WebDAV). Falhas de leitura/envio continuam contabilizadas por imagem sem declarar sucesso.
 
-### Primeiro teste no Samsung Galaxy S26
+### Validação em dispositivo Android
 
-1. Instalar/executar em **Debug**, na mesma rede doméstica do servidor, com a CA raiz do Caddy instalada no Android.
-2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
+1. Instalar/executar em **Debug** em um dispositivo Android com acesso ao servidor e certificado confiável. Se o Caddy utilizar uma CA local, instalá-la no dispositivo.
+2. Informar na ConfigPage `https://cloud.example/remote.php/dav/files/USUARIO/FavoritasBackUp/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
 3. Conceder acesso às imagens; acesso parcial limita os resultados às imagens autorizadas.
 4. Marcar uma foto capturada hoje como favorita. Manter uma foto de outro dia favorita e uma de hoje não favorita para conferir que ficam de fora. Tocar em **Sincronizar**.
 5. Conferir os contadores e os arquivos em `FavoritasBackUp` no Nextcloud (nomes originais com extensão). Repetir para confirmar que arquivos existentes são ignorados sem sobrescrita.
