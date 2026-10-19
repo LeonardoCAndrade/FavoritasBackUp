@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
 using System.Text;
 using FavoritasBackUp.Models;
 
@@ -53,11 +52,10 @@ public sealed class NextcloudBackupService(
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    // Two streaming reads avoid buffering the image and give identical content a stable name.
-                    byte[] hash;
-                    using (var source = await photoLibrary.OpenReadAsync(photo, cancellationToken))
-                        hash = await SHA256.HashDataAsync(source, cancellationToken);
-                    var name = Convert.ToHexString(hash).ToLowerInvariant();
+                    var name = photo.FileName;
+                    if (string.IsNullOrWhiteSpace(name) || name is "." or ".." ||
+                        name.Contains('/') || name.Contains('\\'))
+                        throw new IOException("O nome original da imagem está ausente ou é inválido.");
                     using var sourceContent = await photoLibrary.OpenReadAsync(photo, cancellationToken);
                     using var request = CreateRequest(HttpMethod.Put, new Uri(folder, Uri.EscapeDataString(name)), authorization);
                     request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Any);

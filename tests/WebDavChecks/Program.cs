@@ -1,5 +1,4 @@
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using FavoritasBackUp.Models;
 using FavoritasBackUp.Services;
@@ -15,7 +14,7 @@ static void Check(bool condition, string message)
 
 static PhotoInfo Photo(int id, DateTime? date, bool favorite = true) => new()
 {
-    Id = id, ContentUri = $"content://images/{id}", FileName = "../../unsafe.jpg",
+    Id = id, ContentUri = $"content://images/{id}", FileName = id == 2 ? "foto ação #100%.png" : $"20261019_14302{id}.jpg",
     DateTakenUtc = date, DateAddedUtc = DateTime.UtcNow, IsFavorite = favorite
 };
 
@@ -37,15 +36,16 @@ var handler = new Handler(async request =>
     Check(request.Method == HttpMethod.Put, "Expected PUT");
     Check(request.Headers.IfNoneMatch.ToString() == "*", "Missing no-overwrite condition");
     var data = await request.Content!.ReadAsByteArrayAsync();
-    var hash = Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
-    Check(request.RequestUri.AbsolutePath.EndsWith("/FavoritasBackUp/" + hash), "Unsafe or unstable filename");
+    var photo = library.Photos[putCount];
+    Check(data.SequenceEqual(Encoding.UTF8.GetBytes(photo.ContentUri)), "Image bytes must remain unchanged");
+    Check(request.RequestUri.AbsolutePath.EndsWith("/FavoritasBackUp/" + Uri.EscapeDataString(photo.FileName)), "Original filename and extension must be escaped");
     return new(++putCount switch { 1 => HttpStatusCode.Created, 2 => HttpStatusCode.PreconditionFailed, _ => HttpStatusCode.InternalServerError });
 });
 var service = new NextcloudBackupService(new HttpClient(handler), config, library);
 var result = await service.BackupTodayAsync();
 Check(result.Total == 3 && result.Uploaded == 1 && result.Skipped == 1 && result.Failed == 1, "Date filter or accounting failed");
-Check(library.Opened == 6 && library.Disposed == 6, "Streams must be disposed");
-Console.WriteLine("PASS local capture date, unknown date exclusion, counts, Basic, PUT condition, safe stable names, stream disposal");
+Check(library.Opened == 3 && library.Disposed == 3, "Streams must be disposed");
+Console.WriteLine("PASS local capture date, unknown date exclusion, counts, Basic, PUT condition, original escaped names, stream disposal");
 
 foreach (var status in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden, HttpStatusCode.NotFound, HttpStatusCode.Redirect, HttpStatusCode.Conflict })
 {
@@ -75,8 +75,9 @@ foreach (var destination in new[] {
     {
         Check(request.Method == HttpMethod.Put, "No directory management requests allowed");
         var bytes = await request.Content!.ReadAsByteArrayAsync();
-        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-        Check(request.RequestUri!.AbsoluteUri == destination.TrimEnd('/') + "/" + hash, "Must upload directly to configured folder");
+        Check(bytes.SequenceEqual(Encoding.UTF8.GetBytes(library.Photos[calls].ContentUri)), "Original bytes at configured destination");
+        var name = Uri.EscapeDataString(library.Photos[calls].FileName);
+        Check(request.RequestUri!.AbsoluteUri == destination.TrimEnd('/') + "/" + name, "Must upload directly to configured folder");
         calls++;
         return new HttpResponseMessage(HttpStatusCode.Created);
     })), config, library);

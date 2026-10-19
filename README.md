@@ -92,8 +92,8 @@ O projeto é desenvolvido utilizando o Visual Studio 2026.
 - Envio sequencial por streaming via PUT diretamente à pasta WebDAV configurada, que deve ser criada manualmente no Nextcloud, preservando os originais.
 - HTTP Basic com senha de aplicativo do Nextcloud, somente HTTPS, sem seguir redirecionamentos.
 - Nenhuma criação ou verificação remota de diretórios. HTTP 404/409 orienta criar a pasta manualmente e conferir a URL.
-- Nomes compostos pelo SHA-256 completo do conteúdo, sem extensão ou nome original. Duas leituras por streaming (hash e envio), sem cópia integral em memória. Conteúdos idênticos compartilham o destino.
-- `PUT` com `If-None-Match: *`: HTTP 412 conta como já existente/ignorado, sem sobrescrita.
+- Nomes originais do MediaStore (`DISPLAY_NAME`), incluindo extensão, codificados como segmento da URL. Envio por streaming sem cópia integral em memória; o identificador interno permanece inalterado.
+- `PUT` com `If-None-Match: *`: HTTP 412 conta como já existente/ignorado, sem sobrescrita. Fotos diferentes com o mesmo nome também são ignoradas, sem comparação do conteúdo.
 - Resultado com favoritas de hoje, enviadas, ignoradas e falhas; prevenção de execuções simultâneas.
 - Última sincronização atualizada na tela somente quando há imagens e todas foram enviadas ou confirmadas como existentes, sem falhas. Esse horário não é persistido entre reinicializações.
 - Nenhuma foto ou miniatura é exibida.
@@ -210,6 +210,6 @@ O tratamento de erros diferencia TLS/HTTPS, conexão/tempo limite, HTTP 401 (cre
 2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
 3. Conceder acesso às imagens; acesso parcial limita os resultados às imagens autorizadas.
 4. Marcar uma foto capturada hoje como favorita. Manter uma foto de outro dia favorita e uma de hoje não favorita para conferir que ficam de fora. Tocar em **Sincronizar**.
-5. Conferir os contadores e os arquivos em `FavoritasBackUp` no Nextcloud (nomes SHA-256 sem extensão). Repetir para confirmar que arquivos existentes são ignorados sem sobrescrita.
+5. Conferir os contadores e os arquivos em `FavoritasBackUp` no Nextcloud (nomes originais com extensão). Repetir para confirmar que arquivos existentes são ignorados sem sobrescrita.
 
 A configuração está implementada; a validação em dispositivo e Nextcloud reais continua em desenvolvimento. Os testes simulados não comprovam a confiança TLS no celular nem a integração da Galeria Samsung com `IS_FAVORITE`.
