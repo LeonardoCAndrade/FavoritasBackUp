@@ -58,7 +58,7 @@
                 <!-- Endereço da nuvem -->
                 <VerticalStackLayout Spacing="8">
                     <Label
-                        Text="URL WebDAV do Nextcloud"
+                        Text="URL WebDAV da pasta de destino"
                         FontSize="14"
                         FontAttributes="Bold"
                         TextColor="#26354A" />
@@ -72,7 +72,7 @@
 
                         <Entry
                             x:Name="CloudAddressEntry"
-                            Placeholder="https://nuvem.com/remote.php/dav/files/usuario/"
+                            Placeholder="https://nuvem.com/remote.php/dav/files/usuario/FavoritasBackUp/"
                             Keyboard="Url"
                             ClearButtonVisibility="WhileEditing"
                             TextColor="#172B4D"
@@ -83,6 +83,11 @@
                 </VerticalStackLayout>
 
                 <!-- Usuário -->
+                <Label
+                    Text="Crie a pasta manualmente no Nextcloud e informe a URL WebDAV completa dessa pasta."
+                    FontSize="12"
+                    TextColor="#64748B" />
+
                 <VerticalStackLayout Spacing="8">
                     <Label
                         Text="Usuário"

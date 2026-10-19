@@ -15,7 +15,7 @@ static class ConnectionChecks
             Check((await new NextcloudConnectionService(client, config).TestAsync()).Contains("Revise a configuração"), "Missing configuration");
         foreach (var prefix in new[] { "", "/nextcloud" })
         {
-            await config.SaveAsync(new() { Url = $"https://cloud.example:8443{prefix}/remote.php/dav/files/user/", Username = "user", Password = "app-password" });
+            await config.SaveAsync(new() { Url = $"https://cloud.example:8443{prefix}/remote.php/dav/files/user/FavoritasBackUp/", Username = "user", Password = "app-password" });
             var calls = 0;
             using var client = new HttpClient(new Handler(request =>
             {

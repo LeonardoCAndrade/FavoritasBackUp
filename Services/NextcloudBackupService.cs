@@ -2,8 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using System.Xml;
-using System.Xml.Linq;
 using FavoritasBackUp.Models;
 
 namespace FavoritasBackUp.Services;
@@ -38,28 +36,11 @@ public sealed class NextcloudBackupService(
                     string.IsNullOrWhiteSpace(config.Username) || config.Username.Contains(':'))
                     return new(photos.Count, 0, 0, photos.Count,
                         "Revise a configuração: informe a URL WebDAV HTTPS, o usuário e a senha de aplicativo do Nextcloud.");
-                folder = new Uri(new Uri(root.AbsoluteUri.TrimEnd('/') + "/"), "FavoritasBackUp/");
+                folder = new Uri(root.AbsoluteUri.TrimEnd('/') + "/");
                 authorization = new("Basic", Convert.ToBase64String(
                     Encoding.UTF8.GetBytes($"{config.Username}:{config.Password}")));
-                await EnsureFolderAsync(folder, authorization, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-            catch (HttpRequestException ex)
-            {
-                System.Diagnostics.Debug.WriteLine(ex.ToString());
-
-                var inner = ex.InnerException;
-
-                while (inner != null)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"{inner.GetType().FullName}: {inner.Message}");
-
-                    inner = inner.InnerException;
-                }
-
-                throw;
-            }
             catch (Exception exception)
             {
                 return new(photos.Count, 0, 0, photos.Count, DescribeError(exception));
@@ -78,7 +59,7 @@ public sealed class NextcloudBackupService(
                         hash = await SHA256.HashDataAsync(source, cancellationToken);
                     var name = Convert.ToHexString(hash).ToLowerInvariant();
                     using var sourceContent = await photoLibrary.OpenReadAsync(photo, cancellationToken);
-                    using var request = CreateRequest(HttpMethod.Put, new Uri(folder, name), authorization);
+                    using var request = CreateRequest(HttpMethod.Put, new Uri(folder, Uri.EscapeDataString(name)), authorization);
                     request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Any);
                     request.Content = new StreamContent(sourceContent);
                     request.Content.Headers.ContentType = new("application/octet-stream");
@@ -100,35 +81,6 @@ public sealed class NextcloudBackupService(
             return new(photos.Count, uploaded, skipped, failed, error);
         }
         finally { _operation.Release(); }
-    }
-
-    private async Task EnsureFolderAsync(Uri folder, AuthenticationHeaderValue authorization, CancellationToken token)
-    {
-        using var request = CreateRequest(new HttpMethod("MKCOL"), folder, authorization);
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-        if (response.StatusCode != HttpStatusCode.MethodNotAllowed)
-        {
-            RequireSuccess(response);
-            return;
-        }
-        // 405 can also mean an unsupported method or an existing file. Verify the collection.
-        using var probe = CreateRequest(new HttpMethod("PROPFIND"), folder, authorization);
-        probe.Headers.Add("Depth", "0");
-        probe.Content = new StringContent("<d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>", Encoding.UTF8, "application/xml");
-        using var existing = await client.SendAsync(probe, HttpCompletionOption.ResponseHeadersRead, token);
-        RequireSuccess(existing);
-        using var stream = await existing.Content.ReadAsStreamAsync(token);
-        using var reader = XmlReader.Create(stream, new XmlReaderSettings
-        {
-            Async = true, DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null,
-            MaxCharactersInDocument = 1024 * 1024
-        });
-        var document = await XDocument.LoadAsync(reader, LoadOptions.None, token);
-        XNamespace dav = "DAV:";
-        if (!document.Descendants(dav + "propstat").Any(p =>
-            p.Element(dav + "status")?.Value.Contains(" 200 ", StringComparison.Ordinal) == true &&
-            p.Element(dav + "prop")?.Element(dav + "resourcetype")?.Element(dav + "collection") is not null))
-            throw new InvalidOperationException("A pasta de backup não está disponível no servidor.");
     }
 
     private static HttpRequestMessage CreateRequest(HttpMethod method, Uri uri, AuthenticationHeaderValue authorization)
@@ -168,7 +120,9 @@ public sealed class NextcloudBackupService(
         HttpRequestException { StatusCode: HttpStatusCode.Forbidden } =>
             "HTTP 403: acesso negado. Verifique a permissão de escrita no Nextcloud.",
         HttpRequestException { StatusCode: HttpStatusCode.NotFound } =>
-            "HTTP 404: destino WebDAV não encontrado. Revise a URL completa, incluindo o usuário no caminho.",
+            "HTTP 404: diretório de destino não encontrado. Crie a pasta manualmente no Nextcloud e confira a URL WebDAV configurada.",
+        HttpRequestException { StatusCode: HttpStatusCode.Conflict } =>
+            "HTTP 409: caminho de destino indisponível. Crie a pasta manualmente no Nextcloud e confira a URL WebDAV configurada.",
         HttpRequestException { StatusCode: not null } http =>
             $"O servidor retornou HTTP {(int)http.StatusCode.Value}. Revise a URL WebDAV e a disponibilidade do Nextcloud. Redirecionamentos não são seguidos.",
         HttpRequestException or OperationCanceledException => "Falha de conexão ou tempo limite. Verifique a rede e a disponibilidade do servidor e tente novamente.",

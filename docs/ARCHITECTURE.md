@@ -265,9 +265,9 @@ Fluxo:
 1. Capturar o dia/fuso local no início e consultar as favoritas pelo serviço existente.
 2. Selecionar favoritas cuja captura UTC convertida para o fuso local corresponda ao dia. Capturas ausentes, zero ou inválidas não são substituídas pela inclusão.
 3. Recuperar configurações do SecureStorage. Exigir URL WebDAV HTTPS sem credenciais embutidas, query ou fragmento. Autenticar com HTTP Basic e senha de aplicativo.
-4. Criar `FavoritasBackUp/` na raiz WebDAV por `MKCOL`. HTTP 405 requer `PROPFIND` com `Depth: 0` para confirmar uma coleção existente; um arquivo ocupando esse caminho é falha.
-5. Calcular SHA-256 do conteúdo por streaming e usar o hash completo como nome seguro e estável, sem extensão. Abrir novamente a URI para enviar sequencialmente por streaming usando `PUT` e `If-None-Match: *`. HTTP 412 conta como ignorado; conteúdos idênticos compartilham o destino.
-6. Contabilizar erros por imagem, mantendo os envios anteriores. Falhas na configuração/pasta contabilizam todas as candidatas como falhas. Uma queda de conexão após envio pode deixar o arquivo no servidor; a próxima tentativa o reconhecerá pela condição HTTP.
+4. Interpretar a URL salva como a pasta final de destino, já criada manualmente pelo usuário. Normalizar somente a barra final, sem acrescentar FavoritasBackUp ou subpastas de data. Não executar MKCOL, PROPFIND ou outras operações de administração remota.
+5. Calcular SHA-256 do conteúdo por streaming e usar o hash completo como nome seguro e estável, sem extensão. Codificar esse nome como segmento com Uri.EscapeDataString e resolvê-lo contra a URL configurada com barra final. O nome original não participa do caminho, impedindo travessia de diretórios. Abrir novamente a URI para enviar sequencialmente por streaming usando `PUT` e `If-None-Match: *`. HTTP 412 conta como ignorado; conteúdos idênticos compartilham o destino.
+6. Contabilizar erros por imagem, mantendo os envios anteriores. Falhas na configuração contabilizam todas as candidatas como falhas. Erros HTTP durante o PUT são contabilizados por imagem; HTTP 404/409 orienta criar a pasta manualmente e conferir a URL, sem tentativas de criá-la. Uma queda de conexão após envio pode deixar o arquivo no servidor; a próxima tentativa o reconhecerá pela condição HTTP.
 
 O `HttpClient` singleton é registrado no `MauiProgram.cs` com `Xamarin.Android.Net.AndroidMessageHandler`, utilizando o transporte nativo e a configuração de segurança de rede do Android, sem redirecionamentos nem cookies e limite de dez minutos por requisição. Credenciais são colocadas em cada requisição, sem cabeçalho global compartilhado. A validação TLS permanece ativa.
 
@@ -280,7 +280,7 @@ https://192.168.15.7:8443 {
 }
 ```
 
-O endpoint WebDAV é `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/`, em que `USUARIO` representa o usuário configurado no Nextcloud. O IP local atual é `192.168.15.7`; a URL permanece configurável pelo usuário.
+O endpoint WebDAV é `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, em que `USUARIO` representa o usuário configurado no Nextcloud. A pasta FavoritasBackUp deve existir previamente, criada manualmente no Nextcloud. A URL permanece configurável pelo usuário, inclusive para outra pasta; configurações antigas apontando à raiz devem ser editadas para o destino desejado. O IP local atual é `192.168.15.7`.
 
 O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade precisa ser confiável nos dispositivos clientes, sem desabilitar a validação TLS. Conforme informado pelo usuário, a CA raiz já está instalada no Android e o navegador do Galaxy S26 acessa o Nextcloud corretamente por HTTPS. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
 
@@ -296,7 +296,7 @@ O sucesso exige HTTP 2xx, `ocs.meta.status=ok`, código OCS v2 `200` e `ocs.data
 
 Exceções e `InnerException` são percorridas: tipo, HResult, mensagem e stack trace são registrados na saída Debug, com usuário, senha, URL salva e token Basic (incluindo representações escapadas) ocultados. A interface apresenta mensagens específicas para falhas de certificado/TLS, conexão, timeout, HTTP, OCS e JSON inválido; os detalhes técnicos ficam no diagnóstico. O botão permanece abaixo de Sincronizar, desabilitado durante o teste e acompanhado de indicador de carregamento, sendo reabilitado no finally. Antes de carregar as credenciais, mensagens arbitrárias de exceções de armazenamento são omitidas. Corpos OCS e mensagens fornecidas pelo servidor não são registrados, para evitar expor dados da conta. O serviço não altera o estado da sincronização.
 
-Os testes OCS simulam transporte e verificam GET exclusivo, URL com prefixo/porta, autenticação, headers, erros HTTP/OCS, JSON/URL inválidos, cancelamento, usuário autenticado, ausência de configurações, indisponibilidade, erro TLS, timeout, novas tentativas e ocultação de credenciais na cadeia de exceções. O timeout é exercitado com transporte que aguarda cancelamento e limite curto do HttpClient, sem esperar 30 segundos. Não substituem integração real com Nextcloud nem validação TLS no Galaxy. Conforme informado pelo usuário, o teste HTTPS/autenticado já funcionou no Galaxy S26; as melhorias de interface ainda precisam de conferência no aparelho. A alteração preexistente em `NextcloudBackupService` que relança `HttpRequestException` foi preservada; ela causa falha na suíte de backup ao verificar erros HTTP tratados.
+Os testes OCS simulam transporte e verificam GET exclusivo, URL com prefixo/porta, autenticação, headers, erros HTTP/OCS, JSON/URL inválidos, cancelamento, usuário autenticado, ausência de configurações, indisponibilidade, erro TLS, timeout, novas tentativas e ocultação de credenciais na cadeia de exceções. O timeout é exercitado com transporte que aguarda cancelamento e limite curto do HttpClient, sem esperar 30 segundos. Não substituem integração real com Nextcloud nem validação TLS no Galaxy. Conforme informado pelo usuário, o teste HTTPS/autenticado já funcionou no Galaxy S26; as melhorias de interface ainda precisam de conferência no aparelho. A administração de diretórios e o bloco de diagnóstico que relançava exceções HTTP dessa etapa foram removidos. A suíte de backup valida somente PUT, caminho final com prefixo/porta/espaços codificados, barras finais, seleção do dia, não sobrescrita, contadores e falhas HTTP/TLS/conexão, sem servidor real.
 
 ## 11. Persistência local — Planejada
 
@@ -352,7 +352,7 @@ O tratamento de erros diferencia TLS/HTTPS, conexão/tempo limite, HTTP 401 (cre
 ### Primeiro teste no Samsung Galaxy S26
 
 1. Instalar/executar em **Debug**, na mesma rede doméstica do servidor, com a CA raiz do Caddy instalada no Android.
-2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
+2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
 3. Conceder acesso às imagens; acesso parcial limita os resultados às imagens autorizadas.
 4. Marcar uma foto capturada hoje como favorita. Manter uma foto de outro dia favorita e uma de hoje não favorita para conferir que ficam de fora. Tocar em **Sincronizar**.
 5. Conferir os contadores e os arquivos em `FavoritasBackUp` no Nextcloud (nomes SHA-256 sem extensão). Repetir para confirmar que arquivos existentes são ignorados sem sobrescrita.

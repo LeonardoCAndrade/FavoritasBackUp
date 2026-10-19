@@ -89,9 +89,9 @@ O projeto é desenvolvido utilizando o Visual Studio 2026.
 - Permissões de leitura completas ou parciais conforme a versão do Android.
 - Consulta de favoritas pelo indicador público `IS_FAVORITE` do MediaStore (Android 11 ou superior).
 - Filtro pela captura `DATE_TAKEN`, em milissegundos Unix, convertida para o fuso local do celular. A inclusão (`DATE_ADDED`) não é usada como captura; imagens sem captura válida ficam fora do backup.
-- Envio sequencial por streaming para `FavoritasBackUp` na raiz WebDAV configurada, preservando os originais.
+- Envio sequencial por streaming via PUT diretamente à pasta WebDAV configurada, que deve ser criada manualmente no Nextcloud, preservando os originais.
 - HTTP Basic com senha de aplicativo do Nextcloud, somente HTTPS, sem seguir redirecionamentos.
-- Criação por `MKCOL`; se a pasta já existe, confirmação de que o destino é uma coleção WebDAV.
+- Nenhuma criação ou verificação remota de diretórios. HTTP 404/409 orienta criar a pasta manualmente e conferir a URL.
 - Nomes compostos pelo SHA-256 completo do conteúdo, sem extensão ou nome original. Duas leituras por streaming (hash e envio), sem cópia integral em memória. Conteúdos idênticos compartilham o destino.
 - `PUT` com `If-None-Match: *`: HTTP 412 conta como já existente/ignorado, sem sobrescrita.
 - Resultado com favoritas de hoje, enviadas, ignoradas e falhas; prevenção de execuções simultâneas.
@@ -166,7 +166,7 @@ https://192.168.15.7:8443 {
 
 O certificado TLS é emitido pela autoridade certificadora local do Caddy (`tls internal`), não por uma autoridade certificadora pública. Essa autoridade local precisa ser confiável nos dispositivos clientes, mantendo a validação de certificados TLS ativa.
 
-Na ConfigPage, informe a URL WebDAV completa `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/`, substituindo `USUARIO` pelo usuário configurado no Nextcloud, o usuário e uma **senha de aplicativo** gerada no Nextcloud. Instalações em subdiretórios devem incluir esse prefixo na URL.
+Na ConfigPage, informe a URL WebDAV completa `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, substituindo `USUARIO` pelo usuário configurado no Nextcloud, o usuário e uma **senha de aplicativo** gerada no Nextcloud. Crie a pasta FavoritasBackUp manualmente no Nextcloud antes de sincronizar. A URL salva é o diretório final de envio: nenhuma pasta adicional será acrescentada. Configurações antigas que apontam à raiz do usuário devem ser editadas para incluir a pasta desejada. Instalações em subdiretórios devem incluir esse prefixo na URL.
 
 Conforme informado pelo usuário, a CA raiz já está instalada no Android e o navegador do Galaxy S26 acessa o Nextcloud corretamente por HTTPS. O envio de imagens pelo aplicativo via HTTPS ainda não foi validado. Futuramente, poderá ser implementado um certificado público ou outra solução de acesso remoto seguro.
 
@@ -194,7 +194,7 @@ A configuração inicial, o armazenamento seguro das credenciais e a navegação
 O primeiro backup manual das favoritas capturadas hoje para o Nextcloud está implementado. A compatibilidade com a Galeria Samsung e o envio para um servidor real ainda precisam de validação em dispositivo.
 ## HTTPS no Android para o teste local
 
-A troca para `SocketsHttpHandler` foi revertida. A limitação de métodos WebDAV (`MKCOL`/`PROPFIND`) do handler Android permanece pendente; **Testar conexão** utiliza somente `GET` e não comprova o funcionamento do backup.
+O handler HTTPS validado no dispositivo foi preservado. A sincronização usa exclusivamente PUT, sem MKCOL ou PROPFIND; **Testar conexão** utiliza somente `GET` e não comprova o funcionamento do backup.
 
 Para testar a conexão no Galaxy S26, execute em **Debug**, na mesma rede do Caddy/Nextcloud e com a CA raiz local instalada. Salve a URL WebDAV, usuário e senha de aplicativo nas configurações e toque em **Testar conexão** na tela de sincronização. Para a URL atual, a requisição será `GET https://192.168.15.7:8443/ocs/v2.php/cloud/user?format=json`. Não são necessárias permissões de fotos. O sucesso exige HTTP 2xx, `ocs.meta.status=ok`, `statuscode=200` e `ocs.data.id` preenchido. Falhas mostram mensagens compreensíveis; o diagnóstico completo com stack traces e credenciais ocultadas aparece na saída Debug do Visual Studio. O teste tem limite de 30 segundos e é cancelado ao sair da tela. Conforme informado pelo usuário, o teste de conexão foi validado com sucesso no Samsung Galaxy S26 com HTTPS e autenticação no Nextcloud. As melhorias posteriores precisam de nova conferência visual no dispositivo.
 
@@ -207,7 +207,7 @@ O tratamento de erros diferencia TLS/HTTPS, conexão/tempo limite, HTTP 401 (cre
 ### Primeiro teste no Samsung Galaxy S26
 
 1. Instalar/executar em **Debug**, na mesma rede doméstica do servidor, com a CA raiz do Caddy instalada no Android.
-2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
+2. Informar na ConfigPage `https://192.168.15.7:8443/remote.php/dav/files/USUARIO/FavoritasBackUp/`, o usuário correspondente e uma senha de aplicativo do Nextcloud.
 3. Conceder acesso às imagens; acesso parcial limita os resultados às imagens autorizadas.
 4. Marcar uma foto capturada hoje como favorita. Manter uma foto de outro dia favorita e uma de hoje não favorita para conferir que ficam de fora. Tocar em **Sincronizar**.
 5. Conferir os contadores e os arquivos em `FavoritasBackUp` no Nextcloud (nomes SHA-256 sem extensão). Repetir para confirmar que arquivos existentes são ignorados sem sobrescrita.

@@ -28,13 +28,12 @@ var library = new PhotoLibrary
         Photo(6, DateTime.Today.AddDays(1).ToUniversalTime()), Photo(7, today, false)]
 };
 var config = new CloudConfigurationService(new Storage());
-await config.SaveAsync(new() { Url = "https://cloud.example/remote.php/dav/files/user", Username = "user", Password = "app-password" });
+await config.SaveAsync(new() { Url = "https://cloud.example/remote.php/dav/files/user/FavoritasBackUp", Username = "user", Password = "app-password" });
 var putCount = 0;
 var handler = new Handler(async request =>
 {
     Check(request.RequestUri!.Scheme == "https", "HTTPS required");
     Check(request.Headers.Authorization?.Parameter == Convert.ToBase64String(Encoding.UTF8.GetBytes("user:app-password")), "Basic auth");
-    if (request.Method.Method == "MKCOL") return new(HttpStatusCode.Created);
     Check(request.Method == HttpMethod.Put, "Expected PUT");
     Check(request.Headers.IfNoneMatch.ToString() == "*", "Missing no-overwrite condition");
     var data = await request.Content!.ReadAsByteArrayAsync();
@@ -53,36 +52,38 @@ foreach (var status in new[] { HttpStatusCode.Unauthorized, HttpStatusCode.Forbi
     var calls = 0;
     var failure = new NextcloudBackupService(new HttpClient(new Handler(_ =>
     {
+        Check(_.Method == HttpMethod.Put, "Only PUT allowed on error paths");
         calls++;
         return Task.FromResult(new HttpResponseMessage(status));
     })), config, library);
     var failed = await failure.BackupTodayAsync();
-    Check(failed.Failed == 3 && failed.Uploaded == 0 && calls == 1, "Folder error must prevent PUT");
+    Check(failed.Failed == 3 && failed.Uploaded == 0 && calls == 3, "Failed PUTs must not count as uploads");
     Check(failed.Error?.Contains(((int)status).ToString()) == true, "HTTP error must identify its status");
+    if (status is HttpStatusCode.NotFound or HttpStatusCode.Conflict)
+        Check(failed.Error?.Contains("Crie a pasta manualmente") == true, "Missing folder guidance");
 }
 Console.WriteLine("PASS authentication, HTTP errors and redirect response accounting");
 
-foreach (var isCollection in new[] { true, false })
+foreach (var destination in new[] {
+    "https://cloud.example:8443/nextcloud/remote.php/dav/files/other/Minha%20pasta",
+    "https://cloud.example:8443/nextcloud/remote.php/dav/files/other/Minha%20pasta/",
+    "https://cloud.example:8443/nextcloud/remote.php/dav/files/other/Minha%20pasta///" })
 {
-    var existing = new NextcloudBackupService(new HttpClient(new Handler(request =>
+    await config.SaveAsync(new() { Url = destination, Username = "user", Password = "app-password" });
+    var calls = 0;
+    var direct = new NextcloudBackupService(new HttpClient(new Handler(async request =>
     {
-        var response = request.Method.Method switch
-        {
-            "MKCOL" => new HttpResponseMessage(HttpStatusCode.MethodNotAllowed),
-            "PROPFIND" => new HttpResponseMessage((HttpStatusCode)207)
-            {
-                Content = new StringContent("<d:multistatus xmlns:d='DAV:'><d:response><d:propstat><d:prop><d:resourcetype>" +
-                    (isCollection ? "<d:collection/>" : "") +
-                    "</d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>")
-            },
-            _ => new HttpResponseMessage(HttpStatusCode.PreconditionFailed)
-        };
-        return Task.FromResult(response);
+        Check(request.Method == HttpMethod.Put, "No directory management requests allowed");
+        var bytes = await request.Content!.ReadAsByteArrayAsync();
+        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        Check(request.RequestUri!.AbsoluteUri == destination.TrimEnd('/') + "/" + hash, "Must upload directly to configured folder");
+        calls++;
+        return new HttpResponseMessage(HttpStatusCode.Created);
     })), config, library);
-    var outcome = await existing.BackupTodayAsync();
-    Check(isCollection ? outcome.Skipped == 3 && outcome.Failed == 0 : outcome.Failed == 3, "405 must verify collection");
+    var outcome = await direct.BackupTodayAsync();
+    Check(outcome.Uploaded == 3 && outcome.Failed == 0 && calls == 3, "Direct uploads");
 }
-Console.WriteLine("PASS existing folder and file occupying folder path");
+Console.WriteLine("PASS PUT-only direct destination with prefix, encoded path, custom port and trailing slash normalization");
 
 await config.SaveAsync(new() { Url = "http://cloud.example/", Username = "user", Password = "app-password" });
 var insecure = await service.BackupTodayAsync();
